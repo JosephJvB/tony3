@@ -1,0 +1,55 @@
+---
+import Layout from '../layouts/Layout.astro'
+import { getProfile } from '../lib/spotify/spotifyApi'
+// https://github.com/websockets/ws
+import WebSocket, { WebSocketServer } from 'ws'
+
+const accessToken = Astro.cookies.get('spotify_token')!
+const profile = await getProfile(accessToken.value)
+const image = profile.images[0]
+
+const server = new WebSocketServer({ port: 8080 })
+server.on('connection', (socket) => {
+  console.log('client connected')
+
+  socket.on('message', (message) => {
+    console.log('received:', message.toString())
+  })
+  socket.send('hello from server socket')
+})
+server.on('error', (error) => {
+  if ((error as any).code === 'EADDRINUSE') {
+    server.close()
+    return
+  }
+  console.error('server error', error)
+})
+---
+
+<script>
+  export class ResultsPage extends HTMLDivElement {
+    #connection: WebSocket
+    constructor() {
+      super()
+
+      this.#connection = new WebSocket(`ws://${window.location.hostname}:8080`)
+      this.#connection.addEventListener('open', (event) => {
+        // need to save websocket info to cookie / localstorage
+        this.#connection.send('hello from client socket')
+      })
+      this.#connection.addEventListener('message', (event) => {
+        console.log('received:', event.data)
+      })
+    }
+  }
+  customElements.define('results-page', ResultsPage, {
+    extends: 'div',
+  })
+</script>
+<Layout title="melon | results">
+  <main is="results-page">
+    <h1>Results Page</h1>
+    <p>{profile.display_name}</p>
+    <img src={image?.url} />
+  </main>
+</Layout>

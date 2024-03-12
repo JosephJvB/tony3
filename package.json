@@ -12,8 +12,7 @@
   "dependencies": {
     "@astrojs/check": "^0.5.7",
     "astro": "^4.5.0",
-    "typescript": "^5.4.2",
-    "ws": "^8.16.0"
+    "typescript": "^5.4.2"
   },
   "devDependencies": {
     "@types/node": "^20.11.25",

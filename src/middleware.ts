@@ -4,7 +4,7 @@ export const onRequest: MiddlewareHandler = async (
   { cookies, redirect, request },
   next
 ) => {
-  const PRE_AUTH_URLS = ['/', '/callback']
+  const PRE_AUTH_URLS = ['/', '/callback', '/about']
   if (PRE_AUTH_URLS.includes(new URL(request.url).pathname)) {
     return next()
   }

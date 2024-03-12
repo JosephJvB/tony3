@@ -1,45 +1,84 @@
 ---
 import Layout from '../layouts/Layout.astro'
 import { getProfile } from '../lib/spotify/spotifyApi'
-// https://github.com/websockets/ws
-import WebSocket, { WebSocketServer } from 'ws'
 
 const accessToken = Astro.cookies.get('spotify_token')!
 const profile = await getProfile(accessToken.value)
 const image = profile.images[0]
-
-const server = new WebSocketServer({ port: 8080 })
-server.on('connection', (socket) => {
-  console.log('client connected')
-
-  socket.on('message', (message) => {
-    console.log('received:', message.toString())
-  })
-  socket.send('hello from server socket')
-})
-server.on('error', (error) => {
-  if ((error as any).code === 'EADDRINUSE') {
-    server.close()
-    return
-  }
-  console.error('server error', error)
-})
 ---
 
 <script>
+  import { getTopTracks } from '../lib/spotify/spotifyApi'
+  import { getCookie } from '../lib/util/cookie'
+
+  type SpotifyPlaylistJson = {
+    id: string
+    name: string
+    description: string
+    trackIds: string[]
+  }
   export class ResultsPage extends HTMLDivElement {
-    #connection: WebSocket
+    timePeriod: 'short' | 'long' = 'short'
+
     constructor() {
       super()
 
-      this.#connection = new WebSocket(`ws://${window.location.hostname}:8080`)
-      this.#connection.addEventListener('open', (event) => {
-        // need to save websocket info to cookie / localstorage
-        this.#connection.send('hello from client socket')
+      this.loadData()
+    }
+
+    async loadData() {
+      const [usersTracks, playlists] = await Promise.all([
+        this.loadUsersTracks(),
+        this.loadS3PlaylistsJson(),
+      ])
+
+      console.log('loaded', usersTracks.length, 'users tracks')
+
+      const tonysTracks = new Set<string>()
+      playlists.forEach((p) => {
+        p.trackIds.forEach((id) => {
+          tonysTracks.add(id)
+        })
       })
-      this.#connection.addEventListener('message', (event) => {
-        console.log('received:', event.data)
+
+      console.log('loaded', tonysTracks.size, 'tony tracks')
+
+      const melonTracks = usersTracks.filter((t) => {
+        const justId = t.id.split(':').pop()!
+        return tonysTracks.has(justId)
       })
+
+      console.log(melonTracks.length, '/', usersTracks.length, 'are melonious')
+      console.log('you are the melonious monk')
+      console.log(melonTracks.map((t) => [t.name, t.artists[0].name].join('-')))
+    }
+
+    async loadUsersTracks() {
+      const token = getCookie('spotify_token')
+      if (!token) {
+        console.error('no spotify token cookie found')
+        window.location.pathname = '/'
+        return []
+      }
+
+      return await getTopTracks({
+        token,
+        numberOfTracks: this.timePeriod === 'short' ? 20 : 50,
+        timePeriod: this.timePeriod,
+      })
+    }
+
+    async loadS3PlaylistsJson() {
+      const response = await fetch(
+        'https://tony2stack-web-assets.s3.eu-west-2.amazonaws.com/json/spotify-playlists.json'
+      )
+      const json = await response.json()
+
+      if (!response.ok) {
+        throw new Error('loadS3PlaylistsJson failed:\n' + JSON.stringify(json))
+      }
+
+      return json as SpotifyPlaylistJson[]
     }
   }
   customElements.define('results-page', ResultsPage, {

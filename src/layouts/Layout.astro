@@ -1,5 +1,6 @@
 ---
 import { ViewTransitions } from 'astro:transitions'
+import Nav from '../components/Nav.astro'
 
 interface Props {
   title: string
@@ -20,6 +21,7 @@ const { title } = Astro.props
     <ViewTransitions />
   </head>
   <body>
+    <Nav />
     <slot />
     <style is:global>
       :root {
